@@ -1,0 +1,13 @@
+syntax = "proto3";
+option go_package = "Handin3/chittychat/chitty_chat";
+package chittychat;
+
+message Chat {
+    string text = 1;
+
+    int32 timestamp = 2;
+}
+
+service ChittyChat {
+    rpc ChatStream(stream Chat) returns (stream Chat) {}
+}

@@ -6,7 +6,9 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"sync"
 	"time"
+	"unicode/utf8"
 
 	proto "github.com/Xamyg/ChittyChat.git/chittychat"
 
@@ -15,9 +17,11 @@ import (
 )
 
 var (
-	name      = flag.String("name", "defaultName", "Name to greet")
+	name      = flag.String("name", "Anonymous", "Name to greet")
 	timestamp = flag.Int64("time", 0, "Lamport timestamp")
 )
+
+var mu sync.Mutex
 
 func main() {
 	flag.Parse()
@@ -39,78 +43,99 @@ func runChatStream(client proto.ChittyChatClient) {
 	}
 
 	*timestamp += 1
-	op := fmt.Sprintf("Participant %s joined Chitty-Chat at Lamport time: %d", *name, *timestamp)
-	stream.Send(&proto.Chat{Text: op, Timestamp: *timestamp})
+	op := fmt.Sprintf("Participant %s joined Chitty-Chat", *name)
+	stream.Send(makeMessage(op))
 	go func() {
 		for {
 			in, err := stream.Recv()
 			if err != nil && err != io.EOF {
 				log.Fatalf("client.RouteChat2 failed: %v", err)
 			}
+			mu.Lock()
 			*timestamp = max(in.Timestamp, *timestamp) + 1
-
-			log.Printf("Got message %s at timestamp %d", in.Text, in.Timestamp)
+			mu.Unlock()
+			log.Printf("Received message %s at timestamp %d", in.Text, in.Timestamp)
 		}
 	}()
 	runScript(stream)
 	*timestamp += 1
-	end := fmt.Sprintf("Participant %s left Chitty-Chat at Lamport time: %d", *name, *timestamp)
-	stream.Send(&proto.Chat{Text: end, Timestamp: *timestamp})
+	end := fmt.Sprintf("Participant %s left Chitty-Chat...", *name)
+	stream.Send(makeMessage(end))
 	stream.CloseSend()
 }
 
 func runScript(stream proto.ChittyChat_ChatStreamClient) {
 	if *name == "Xander" {
-		Chat1 := &proto.Chat{Text: "Hello everyone", Timestamp: *timestamp}
-		Chat2 := &proto.Chat{Text: "How are things?", Timestamp: *timestamp}
-		Chat3 := &proto.Chat{Text: "Goodbye!", Timestamp: *timestamp}
+		*timestamp += 1
+		stream.Send(makeMessage("Hello everyone"))
+
+		time.Sleep(4 * time.Second)
 
 		*timestamp += 1
-		stream.Send(Chat1)
+		stream.Send(makeMessage("How are things?"))
+
 		time.Sleep(4 * time.Second)
+
 		*timestamp += 1
-		stream.Send(Chat2)
-		time.Sleep(4 * time.Second)
-		*timestamp += 1
-		stream.Send(Chat3)
+		stream.Send(makeMessage("Goodbye!"))
 	} else if *name == "Johan" {
-		Chat1 := &proto.Chat{Text: "Hej mit navn er Johan!", Timestamp: *timestamp}
-		Chat2 := &proto.Chat{Text: "Jeg glæder mig til at være med i the chitty-chat community", Timestamp: *timestamp}
-		Chat3 := &proto.Chat{Text: "Hvad har folk gang i?", Timestamp: *timestamp}
-		Chat4 := &proto.Chat{Text: "Jeg elsker distributed systems, jeg tror faktisk det er den bedste undervisning, jeg nogensinde har fået", Timestamp: *timestamp}
-		Chat5 := &proto.Chat{Text: "Jeg skal smutte, så vi ses chatters!", Timestamp: *timestamp}
+		*timestamp += 1
+		stream.Send(makeMessage("Hej mit navn er Johan!"))
+
+		time.Sleep(3 * time.Second)
 
 		*timestamp += 1
-		stream.Send(Chat1)
-		time.Sleep(3 * time.Second)
-		*timestamp += 1
-		stream.Send(Chat2)
+		stream.Send(makeMessage("Jeg glæder mig til at være med i the chitty-chat community"))
+
 		time.Sleep(2 * time.Second)
+
 		*timestamp += 1
-		stream.Send(Chat3)
+		stream.Send(makeMessage("Hvad har folk gang i?"))
+
 		time.Sleep(6 * time.Second)
-		*timestamp += 1
-		stream.Send(Chat4)
-		time.Sleep(4 * time.Second)
-		*timestamp += 1
-		stream.Send(Chat5)
-	} else {
-		Chat1 := &proto.Chat{Text: "Hej alle sammen!", Timestamp: *timestamp}
-		Chat2 := &proto.Chat{Text: "Jeg kan godt lide flæskesteg", Timestamp: *timestamp}
-		Chat3 := &proto.Chat{Text: "Men der skal massere af sovs på", Timestamp: *timestamp}
-		Chat4 := &proto.Chat{Text: "Farvel og Tak med dig fister", Timestamp: *timestamp}
 
 		*timestamp += 1
-		stream.Send(Chat1)
-		time.Sleep(2 * time.Second)
+		stream.Send(makeMessage("Jeg elsker distributed systems, jeg tror faktisk det er den bedste undervisning, jeg nogensinde har fået"))
+
+		time.Sleep(4 * time.Second)
+
 		*timestamp += 1
-		stream.Send(Chat2)
+		stream.Send(makeMessage("Jeg skal smutte, så vi ses chatters!"))
+	} else {
+
+		*timestamp += 1
+
+		stream.Send(makeMessage("Hej alle sammen!"))
+
+		time.Sleep(2 * time.Second)
+
+		*timestamp += 1
+
+		stream.Send(makeMessage("Jeg kan godt lide flæskesteg"))
+
 		time.Sleep(1 * time.Second)
+
 		*timestamp += 1
-		stream.Send(Chat3)
+		stream.Send(makeMessage("Men der skal massere af sovs på"))
+
 		time.Sleep(3 * time.Second)
+
 		*timestamp += 1
-		stream.Send(Chat4)
-		time.Sleep(2 * time.Second)
+		stream.Send(makeMessage("Farvel og Tak med dig fister"))
 	}
+}
+
+func makeMessage(str string) *proto.Chat {
+	var err error
+	if len(str) > 128 {
+		err = fmt.Errorf("Chat message can't exceed 128 characters")
+	}
+	if !utf8.ValidString(str) {
+		err = fmt.Errorf("String is not supported by UTF-8")
+	}
+	if err != nil {
+		log.Fatalf("Message creation failed: %v", err)
+	}
+	return &proto.Chat{Text: fmt.Sprintf("%s: %s", *name, str), Timestamp: *timestamp, User: *name}
+
 }

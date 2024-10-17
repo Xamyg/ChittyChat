@@ -1,7 +1,6 @@
 package main
 
 import (
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -26,7 +25,7 @@ func main() {
 
 func (s *ChittyChatServer) start_server() {
 	grpcServer := grpc.NewServer()
-	lis, err := net.Listen("tcp", fmt.Sprintf("localhost:50051"))
+	lis, err := net.Listen("tcp", "localhost:50051")
 	if err != nil && err != io.EOF {
 		log.Fatalf("failed to listen: %v", err)
 	}
@@ -41,17 +40,20 @@ func (s *ChittyChatServer) start_server() {
 
 func (s *ChittyChatServer) ChatStream(stream proto.ChittyChat_ChatStreamServer) error {
 	s.clientStreams = append(s.clientStreams, stream)
-	for {
-		input, err := stream.Recv()
-		if err != nil && err != io.EOF {
-			return err
-		}
-		s.timestamp = max(s.timestamp, input.Timestamp) + 1
+	go func() {
+		for {
+			input, err := stream.Recv()
+			if err != nil && err != io.EOF {
+				return err
+			}
+			s.timestamp = max(s.timestamp, input.Timestamp) + 1
+			log.Printf("%s has published the message: '%s' at timestamp %d", input.User, input.Text, s.timestamp)
 
-		for _, clientStream := range s.clientStreams {
-			s.timestamp++
-			clientStream.Send(input)
-		}
-
+			for _, clientStream := range s.clientStreams {
+				s.timestamp++
+				clientStream.Send(input)
+				log.Printf("The server broadcasted the message: '%s' at timestamp %d to a client", input.Text, s.timestamp)
+			}
+		}()
 	}
 }

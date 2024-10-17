@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"os/exec"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -25,6 +26,11 @@ var mu sync.Mutex
 
 func main() {
 	flag.Parse()
+	if *name == "Triple" {
+		tripleDemo()
+		return
+	}
+
 	conn, err := grpc.NewClient("localhost:50051", grpc.WithTransportCredentials(insecure.NewCredentials()))
 	if err != nil {
 		log.Fatalf("Not working")
@@ -35,7 +41,7 @@ func main() {
 
 func runChatStream(client proto.ChittyChatClient) {
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
 	defer cancel()
 	stream, err := client.ChatStream(ctx)
 	if err != nil && err != io.EOF {
@@ -54,6 +60,7 @@ func runChatStream(client proto.ChittyChatClient) {
 			mu.Lock()
 			*timestamp = max(in.Timestamp, *timestamp) + 1
 			mu.Unlock()
+			fmt.Println()
 			log.Printf("Received message %s at timestamp %d", in.Text, in.Timestamp)
 		}
 	}()
@@ -138,4 +145,18 @@ func makeMessage(str string) *proto.Chat {
 	}
 	return &proto.Chat{Text: fmt.Sprintf("%s: %s", *name, str), Timestamp: *timestamp, User: *name}
 
+}
+
+func tripleDemo() {
+	params := []string{"--name=Xander", "--name=Johan", "--name=Bob"}
+
+	for _, param := range params {
+		goFilePath := `C:\Users\Xander\Desktop\Go Projects\ChittyChat\Handin 3\client\client.go`
+
+		// Run a new command prompt window with the current Go file and parameter
+		cmd := exec.Command("cmd.exe", "/C", "start", "cmd.exe", "/K", "go", "run", goFilePath, param)
+		// Start the command
+		cmd.Start()
+		fmt.Println("????")
+	}
 }

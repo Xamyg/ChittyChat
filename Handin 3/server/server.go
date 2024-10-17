@@ -1,9 +1,11 @@
 package main
 
 import (
+	"fmt"
 	"io"
 	"log"
 	"net"
+	"sync"
 
 	proto "github.com/Xamyg/ChittyChat.git/chittychat"
 
@@ -15,6 +17,7 @@ type ChittyChatServer struct {
 	chats         []*proto.Chat
 	timestamp     int64
 	clientStreams []proto.ChittyChat_ChatStreamServer
+	mu            sync.Mutex
 }
 
 func main() {
@@ -40,20 +43,24 @@ func (s *ChittyChatServer) start_server() {
 
 func (s *ChittyChatServer) ChatStream(stream proto.ChittyChat_ChatStreamServer) error {
 	s.clientStreams = append(s.clientStreams, stream)
-	go func() {
-		for {
-			input, err := stream.Recv()
-			if err != nil && err != io.EOF {
-				return err
-			}
-			s.timestamp = max(s.timestamp, input.Timestamp) + 1
-			log.Printf("%s has published the message: '%s' at timestamp %d", input.User, input.Text, s.timestamp)
+	for {
+		input, err := stream.Recv()
+		if err != nil && err != io.EOF {
+			return err
+		}
+		s.mu.Lock()
 
-			for _, clientStream := range s.clientStreams {
-				s.timestamp++
-				clientStream.Send(input)
-				log.Printf("The server broadcasted the message: '%s' at timestamp %d to a client", input.Text, s.timestamp)
-			}
-		}()
+		s.timestamp = max(s.timestamp, input.Timestamp) + 1
+		fmt.Println()
+		log.Printf("%s has published the message: '%s' at timestamp %d", input.User, input.Text, s.timestamp)
+
+		for _, clientStream := range s.clientStreams {
+			s.timestamp++
+			clientStream.Send(input)
+			log.Printf("The server broadcasted the message: '%s' at timestamp %d to a client", input.Text, s.timestamp)
+		}
+		s.mu.Unlock()
+
 	}
+
 }

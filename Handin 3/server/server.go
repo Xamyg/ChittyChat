@@ -23,7 +23,6 @@ type ChittyChatServer struct {
 func main() {
 	server := &ChittyChatServer{chats: []*proto.Chat{}}
 	server.start_server()
-
 }
 
 func (s *ChittyChatServer) start_server() {
@@ -42,25 +41,46 @@ func (s *ChittyChatServer) start_server() {
 }
 
 func (s *ChittyChatServer) ChatStream(stream proto.ChittyChat_ChatStreamServer) error {
+	s.mu.Lock()
 	s.clientStreams = append(s.clientStreams, stream)
+	s.mu.Unlock()
+
 	for {
 		input, err := stream.Recv()
-		if err != nil && err != io.EOF {
+		if err == io.EOF {
+			s.removeClientStream(stream)
+			return nil
+		}
+		if err != nil {
+			s.removeClientStream(stream)
 			return err
 		}
-		s.mu.Lock()
 
+		s.mu.Lock()
 		s.timestamp = max(s.timestamp, input.Timestamp) + 1
-		fmt.Println()
-		log.Printf("%s has published the message: '%s' at timestamp %d", input.User, input.Text, s.timestamp)
+		fmt.Println("")
+		log.Printf("%s has published the message: '%s' at Lamport time %d", input.User, input.Text, s.timestamp)
 
 		for _, clientStream := range s.clientStreams {
 			s.timestamp++
 			clientStream.Send(input)
-			log.Printf("The server broadcasted the message: '%s' at timestamp %d to a client", input.Text, s.timestamp)
+			log.Printf("The server broadcasted the message: '%s' at Lamport time %d to a client", input.Text, s.timestamp)
 		}
 		s.mu.Unlock()
-
 	}
-
 }
+
+func (s *ChittyChatServer) removeClientStream(stream proto.ChittyChat_ChatStreamServer) {
+
+    activeStreams := []proto.ChittyChat_ChatStreamServer{}
+
+    for _, clientStream := range s.clientStreams {
+        if clientStream != stream {
+            activeStreams = append(activeStreams, clientStream)
+        }
+    }
+
+    s.clientStreams = activeStreams
+}
+
+

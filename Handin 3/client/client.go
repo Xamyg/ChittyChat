@@ -42,7 +42,6 @@ func main() {
 func runChatStream(client proto.ChittyChatClient) {
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Second)
-	defer cancel()
 	stream, err := client.ChatStream(ctx)
 	if err != nil && err != io.EOF {
 		log.Fatalf("client.RouteChat failed: %v", err)
@@ -68,12 +67,15 @@ func runChatStream(client proto.ChittyChatClient) {
 	*timestamp += 1
 	end := fmt.Sprintf("Participant %s left Chitty-Chat...", *name)
 	stream.Send(makeMessage(end))
+	time.Sleep(4 * time.Second)
 	stream.CloseSend()
+	cancel()
 }
 
 func runScript(stream proto.ChittyChat_ChatStreamClient) {
 	if *name == "Xander" {
 		*timestamp += 1
+		time.Sleep(2 * time.Second)
 		stream.Send(makeMessage("Hello everyone"))
 
 		time.Sleep(4 * time.Second)
@@ -85,8 +87,10 @@ func runScript(stream proto.ChittyChat_ChatStreamClient) {
 
 		*timestamp += 1
 		stream.Send(makeMessage("Goodbye!"))
+		time.Sleep(2 * time.Second)
 	} else if *name == "Johan" {
 		*timestamp += 1
+		time.Sleep(2 * time.Second)
 		stream.Send(makeMessage("Hej mit navn er Johan!"))
 
 		time.Sleep(3 * time.Second)
@@ -108,9 +112,11 @@ func runScript(stream proto.ChittyChat_ChatStreamClient) {
 
 		*timestamp += 1
 		stream.Send(makeMessage("Jeg skal smutte, så vi ses chatters!"))
+		time.Sleep(2 * time.Second)
 	} else {
 
 		*timestamp += 1
+		time.Sleep(2 * time.Second)
 
 		stream.Send(makeMessage("Hej alle sammen!"))
 
@@ -129,6 +135,7 @@ func runScript(stream proto.ChittyChat_ChatStreamClient) {
 
 		*timestamp += 1
 		stream.Send(makeMessage("Farvel og Tak med dig fister"))
+		time.Sleep(2 * time.Second)
 	}
 }
 

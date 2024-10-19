@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"os/exec"
+	"runtime"
 	"sync"
 	"time"
 	"unicode/utf8"
@@ -158,12 +159,19 @@ func tripleDemo() {
 	params := []string{"--name=Xander", "--name=Johan", "--name=Bob"}
 
 	for _, param := range params {
-		goFilePath := `C:\Users\Xander\Desktop\Go Projects\ChittyChat\Handin 3\client\client.go`
+		goFilePath := `./client/client.go`
 
-		// Run a new command prompt window with the current Go file and parameter
-		cmd := exec.Command("cmd.exe", "/C", "start", "cmd.exe", "/K", "go", "run", goFilePath, param)
-		// Start the command
+		var cmd *exec.Cmd
+		if runtime.GOOS == "windows" {
+			// For Windows
+			cmd = exec.Command("cmd.exe", "/C", "start", "cmd.exe", "/K", "go", "run", goFilePath, param)
+			log.Print("Windows!!")
+
+		} else {
+			// For Linux and macOS
+			cmd = exec.Command("gnome-terminal", "--", "bash", "-c", "go run "+goFilePath+" "+param+"; exec bash")
+			log.Print("Linux!!")
+		}
 		cmd.Start()
-		fmt.Println("????")
 	}
 }

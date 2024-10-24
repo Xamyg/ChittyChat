@@ -68,7 +68,7 @@ func runChatStream(client proto.ChittyChatClient) {
 	*timestamp += 1
 	end := fmt.Sprintf("Participant %s left Chitty-Chat...", *name)
 	stream.Send(makeMessage(end))
-	time.Sleep(4 * time.Second)
+	time.Sleep(2 * time.Second)
 	stream.CloseSend()
 	cancel()
 }
@@ -165,12 +165,10 @@ func tripleDemo() {
 		if runtime.GOOS == "windows" {
 			// For Windows
 			cmd = exec.Command("cmd.exe", "/C", "start", "cmd.exe", "/K", "go", "run", goFilePath, param)
-			log.Print("Windows!!")
 
 		} else {
 			// For Linux and macOS
 			cmd = exec.Command("gnome-terminal", "--", "bash", "-c", "go run "+goFilePath+" "+param+"; exec bash")
-			log.Print("Linux!!")
 		}
 		cmd.Start()
 	}
